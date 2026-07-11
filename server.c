@@ -7,9 +7,9 @@
 int main() {
     int socket_fd, accept_fd;
     char r_buf[1024];
-    struct sockaddr_in socket_addr;
-    struct sockaddr accept_addr;
+    struct sockaddr_in socket_addr, accept_addr;
 
+    // IPv4, Stream通信 のデフォルトのプロトコルがTCP
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     printf("socket_fd: %d\n", socket_fd);
     if (socket_fd == -1) {
@@ -18,19 +18,26 @@ int main() {
     }
 
     int yes = 1;
+    // ソケットレベルで、アドレスの再利用を許可
+    // 再起動時のポート競合によるバインドのエラーを回避する
     if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
         perror("setsockopt");
         return 1;
     }
 
     socket_addr.sin_family = AF_INET;
+    // ポート番号をネットワークバイトオーダーに変換
     socket_addr.sin_port = htons(8080);
+    // ループバックアドレスをネットワークバイトオーダーに変換
+    // ローカルホストからの接続のみを受け付ける
     socket_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    // ソケットをアドレスにバインドする
     if (bind(socket_fd, (struct sockaddr *)&socket_addr, sizeof(socket_addr)) == -1) {
         perror("bind");
         return 1;
     }
 
+    // accept待ちのキューの最大数を5に設定
     if (listen(socket_fd, 5) == -1) {
         perror("listen");
         return 1;
@@ -38,13 +45,16 @@ int main() {
 
     while(1) {
         socklen_t accept_addr_len = sizeof(accept_addr);
-        accept_fd = accept(socket_fd, &accept_addr, &accept_addr_len);
+        // ソケットから接続済みコネクションを取り出し、コネクションを読み書きするための新しいファイルディスクリプタを返す
+        // 通信元のアドレス情報をaccept_addrに格納する
+        accept_fd = accept(socket_fd, (struct sockaddr *)&accept_addr, &accept_addr_len);
         printf("accept_fd: %d\n", accept_fd);
         if (accept_fd == -1) {
             perror("accept");
             return 1;
         }
 
+        // TODO: Stream通信に対応させる
         if (read(accept_fd, r_buf, sizeof(r_buf)) == -1) {
             perror("read");
             return 1;
