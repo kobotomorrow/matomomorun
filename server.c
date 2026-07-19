@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <stdbool.h>
 
 int main() {
     int socket_fd, accept_fd;
@@ -54,11 +55,41 @@ int main() {
             return 1;
         }
 
-        // TODO: Stream通信に対応させる
-        if (read(accept_fd, r_buf, sizeof(r_buf)) == -1) {
-            perror("read");
-            return 1;
+        ssize_t used = 0;
+        ssize_t read_len = 0;
+        size_t request_len_limit = sizeof(r_buf) - 1;
+        bool request_completed = false;
+        while (1) {
+            read_len = read(accept_fd, r_buf + used, request_len_limit);
+            if (read_len == -1) {
+                perror("read");
+                return 1;
+            }
+            used += read_len;
+            request_len_limit -= read_len;
+            r_buf[used] = '\0';
+            if (strstr(r_buf, "\r\n\r\n") != NULL) {
+                request_completed = true;
+                break;
+            }
+
+            // バッファの上限を超過した場合
+            if (request_len_limit <= 0) {
+                break;
+            }
+
+            // 途中で接続が切れた場合
+            if (read_len == 0) {
+                break;
+            }
         }
+
+        if (!request_completed) {
+            fprintf(stderr, "incomplete HTTP request\n");
+            close(accept_fd);
+            continue;
+        }
+
         printf("request: %s\n", r_buf);
 
         const char *response =
