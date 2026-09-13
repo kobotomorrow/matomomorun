@@ -2,20 +2,10 @@
 """
 
 import socket
-import subprocess
-import sys
-import time
 import unittest
-from pathlib import Path
+from helpers import ServerTestCase, HOST, PORT
 
-
-ROOT = Path(__file__).resolve().parents[1]
-SERVER = ROOT / "server.py"
-HOST = "127.0.0.1"
-PORT = 8080
-
-
-class RequestSizeProbe(unittest.TestCase):
+class RequestSizeProbe(ServerTestCase):
     def test_server_receives_large_request(self):
         marker = b"X-End-Marker: reached-the-end"
         padding = b"a" * 5000
@@ -27,35 +17,18 @@ class RequestSizeProbe(unittest.TestCase):
         )
         self.assertGreater(len(request), 4096)
 
-        server = subprocess.Popen(
-            [sys.executable, "-u", str(SERVER)],
-            cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-
-        # サーバーのリッスン待ち
-        time.sleep(0.1)
-
-        try:
-            conn = socket.create_connection((HOST, PORT), timeout=1)
-            with conn:
-                conn.sendall(request)
-                try:
-                    while conn.recv(4096):
-                        pass
-                except ConnectionResetError:
-                    # リクエストが全て処理される前にサーバーの接続が閉じられる
-                    # エラーによる処理終了ではなく、後続のfailed assertionで確認するため、ここでは握りつぶしている
+        conn = socket.create_connection((HOST, PORT), timeout=1)
+        with conn:
+            conn.sendall(request)
+            try:
+                while conn.recv(4096):
                     pass
-            server.terminate()
-            output, _ = server.communicate(timeout=3)
-        finally:
-            if server.poll() is None:
-                server.kill()
-                server.wait(timeout=3)
+            except ConnectionResetError:
+                # リクエストが全て処理される前にサーバーの接続が閉じられる
+                # エラーによる処理終了ではなく、後続のassertionで確認するため、ここでは握りつぶす
+                pass
 
-        received_log = output.decode("utf-8", errors="replace")
+        received_log = self._stop_server().decode("utf-8", errors="replace")
         self.assertIn(
             marker.decode(),
             received_log,
