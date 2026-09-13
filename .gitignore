@@ -5,3 +5,6 @@ learning_note.md
 zig-out/
 
 AGENTS.md
+
+__pycache__/
+*.py[cod]
