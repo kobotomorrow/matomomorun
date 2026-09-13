@@ -1,12 +1,18 @@
 import socket
 
+REQUEST_BUFFER_SIZE = 4096
+REQUEST_SEPARATOR = b"\r\n\r\n"
+
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(("127.0.0.1", 8080))
 server.listen()
 
 while True:
     conn, addr = server.accept()
-    request = conn.recv(4096)
+    request = b""
+    while REQUEST_SEPARATOR not in request:
+        request += conn.recv(REQUEST_BUFFER_SIZE)
     print(request.decode())
 
     response = (
