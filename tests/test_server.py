@@ -1,11 +1,30 @@
-"""4096バイトを超えるサイズの大きいリクエストをサーバーが受け取れるか確認するテスト。
+"""E2Eテスト
 """
 
 import socket
 import unittest
 from helpers import ServerTestCase, HOST, PORT
 
+class MultipleRequestsProbe(ServerTestCase):
+    """通常の複数回のリクエストをサーバーが正しく処理できるか確認するテスト"""
+    def test_multiple_requests(self):
+        for _ in range(5):
+            conn = socket.create_connection((HOST, PORT), timeout=1)
+            with conn:
+                conn.sendall(
+                    b"GET / HTTP/1.1\r\n"
+                    b"Host: localhost\r\n"
+                    b"\r\n"
+                )
+                try:
+                    response = conn.recv(4096)
+                except ConnectionResetError:
+                    response = b""
+
+            self.assertTrue(response.startswith(b"HTTP/1.1 200 OK"))
+
 class RequestSizeProbe(ServerTestCase):
+    """4096バイトを超えるサイズの大きいリクエストをサーバーが受け取れるか確認するテスト"""
     def test_server_receives_large_request(self):
         marker = b"X-End-Marker: reached-the-end"
         padding = b"a" * 5000
