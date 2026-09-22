@@ -25,7 +25,7 @@ class MultipleRequestsProbe(ServerTestCase):
 
 class RequestSizeProbe(ServerTestCase):
     """4096バイトを超えるサイズの大きいリクエストをサーバーが受け取れるか確認するテスト"""
-    def test_server_receives_large_request(self):
+    def test_large_request(self):
         marker = b"X-End-Marker: reached-the-end"
         padding = b"a" * 5000
         request = (
@@ -56,5 +56,19 @@ class RequestSizeProbe(ServerTestCase):
             f"{received_log[-300:]}",
         )
 
+    def test_without_separator_request(self):
+        request = (
+            b"GET / HTTP/1.1\r\n"
+            b"Host: localhost\r\n"
+        )
+
+        conn = socket.create_connection((HOST, PORT), timeout=1)
+        with conn:
+            conn.sendall(request)
+            conn.shutdown(socket.SHUT_WR)
+            response = conn.recv(4096)
+
+        self.assertEqual(response, b"")
+                
 if __name__ == "__main__":
     unittest.main()
